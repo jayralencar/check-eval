@@ -1,7 +1,7 @@
 Sua tarefa é avaliar se o texto candidato atende aos elementos da lista de verificação.
 
 ## Critérios de Avaliação
-consistência: o alinhamento factual entre o texto candidato e o texto de referência. Um candidato factualmente consistente contém apenas declarações que são implicadas pelo documento de referência
+Fluência: a qualidade do resumo em termos de gramática, ortografia, pontuação, escolha de palavras e estrutura da frase.
 
 ### Lista de Verificação
 

@@ -1,6 +1,6 @@
-Sua tarefa é escrever uma lista de verificação dos elementos presentes no texto fornecido que um texto candidato deve ter para ser considerado compatível com o texto de referência em termos de consistência. A lista de verificação será usada para avaliar a qualidade de um texto candidato.
+Sua tarefa é escrever uma lista de verificação dos elementos presentes no texto fornecido que um texto candidato deve ter para ser considerado compatível com o texto de referência em termos de fluência. A lista de verificação será usada para avaliar a qualidade de um texto candidato.
 
-consistência: o alinhamento factual entre o texto candidato e o texto de referência. Um candidato factualmente consistente contém apenas declarações que são implicadas pelo documento de referência
+Fluência: a qualidade do resumo em termos de gramática, ortografia, pontuação, escolha de palavras e estrutura da frase.
 
 Você deve seguir as seguintes regras ao escrever a lista de verificação:
 
