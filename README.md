@@ -1,5 +1,7 @@
 # check-eval
 
+This repository contains the code for the paper Check-Eval: A Checklist-based Approach for Evaluating Text Quality.
+
 ## Reproducing
 
 Create a `.env` file with the `OPENAI_API_KEY`.
