@@ -22,11 +22,9 @@ class STJ:
         print(self.dataset.info())
     
     def load_data(self, split="TEST"):
-        df = pd.read_csv("./data/sample.csv")
+        df = pd.read_csv("./data/ground_truth.csv")
         return df
-        # shuffle the data
-        # df = df.sample(frac=1).reset_index(drop=True)
-        return df[df["SPLIT"] == split]
+    
 
     def generate(self, criterion="consistency", method="reference"):
         
@@ -37,10 +35,10 @@ class STJ:
         for i, row in self.dataset.iterrows():
             output_file = open(f"results/stj_{criterion}_{method}.json", "w")
             row_dict = row.to_dict()
-            reference = row_dict["sentence_A"]
-            human_score = row_dict["score"]
+            reference = row_dict["TEXT1"]
+            human_score = row_dict["EXPERT_SCORE"]
             human_scores.append(human_score)
-            candidate = row_dict["sentence_B"]
+            candidate = row_dict["TEXT2"]
             checklist = None
 
             if method == "reference":
@@ -74,8 +72,8 @@ class STJ:
 
         # recall and precision items are in different orders
         # so we need to match them by score
-        recall = sorted(recall, key=lambda x: x["score"])
-        precision = sorted(precision, key=lambda x: x["score"])
+        recall = sorted(recall, key=lambda x: x["EXPERT_SCORE"])
+        precision = sorted(precision, key=lambda x: x["EXPERT_SCORE"])
 
         n_items = []
         human_scores = []
@@ -84,7 +82,7 @@ class STJ:
             recall_item = recall[i]['check_eval'][criterion]
             precision_item = precision[i]['check_eval'][criterion]
 
-            human_score = recall[i]["score"]
+            human_score = recall[i]["EXPERT_SCORE"]
             human_scores.append(human_score)
 
             
@@ -102,7 +100,7 @@ class STJ:
     
     def load_result(self, criterion, method):
         a = json.load(open(f"results/stj_{criterion}_{method}.json", "r"))
-        a = sorted(a, key=lambda x: x["score"])
+        a = sorted(a, key=lambda x: x["EXPERT_SCORE"])
         return a
 
     def overall(self, method):
@@ -136,7 +134,7 @@ class STJ:
                 rel_item_p = rel_p[i]['check_eval']["relevance"]
                 flu_item_p = flu_p[i]['check_eval']["fluency"]
 # 
-                # human_score = con_r[i]["score"]
+                # human_score = con_r[i]["EXPERT_SCORE"]
                 # human_scores.append(human_score)
 
                 # pred_score = (con_item_r + coh_item_r + rel_item_r + flu_item_r) / 4
@@ -188,7 +186,7 @@ class STJ:
             rel_item = rel[i]['check_eval']["relevance"]
             flu_item = flu[i]['check_eval']["fluency"]
 
-            human_score = con[i]["score"]
+            human_score = con[i]["EXPERT_SCORE"]
             human_scores.append(human_score)
 
             pred_score = (con_item + coh_item + rel_item + flu_item) / 4
