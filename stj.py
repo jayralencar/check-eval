@@ -8,25 +8,39 @@ from dotenv import main
 import os
 from argparse import ArgumentParser
 import pandas as pd
+from pathlib import Path
 
 main.load_dotenv()
+
+criteria_definitions = {
+    "consistência": "o alinhamento factual entre o texto candidato e o texto de referência. Um candidato factualmente consistente contém apenas declarações que são implicadas pelo documento de referência.",
+    "coerência": "Coerência refere-se à qualidade geral que garante que as frases em um texto se desenvolvam logicamente de uma para a outra, formando um corpo de informações bem estruturado e organizado sobre um determinado tópico.",
+    "relevância": "seleção de conteúdo importante da fonte. O resumo deve incluir apenas informações importantes do documento fonte. Os anotadores foram instruídos a penalizar resumos que contivessem redundâncias e informações em excesso.",
+    "fluência": "a qualidade do resumo em termos de gramática, ortografia, pontuação, escolha de palavras e estrutura da frase.",
+}
 
 class STJ:
     def __init__(self, model="gpt-4-turbo"):
         self.model = model
         self.client = Checkeval(
             api_key=os.environ.get("OPENAI_API_KEY"),
-            model=self.model
+            model=self.model,
+            criteria_definitions=criteria_definitions
         )
         self.dataset = self.load_data()
-        print(self.dataset.info())
+        
+        self.generate_checklist_prompt = open(Path(__file__).parent / "checkeval" / "prompts" / "generate_checklist_pt.md").read()
+        self.evaluate_checklist_prompt = open(Path(__file__).parent / "checkeval" / "prompts" / "evaluate_checklist_pt.md").read()
+
     
     def load_data(self, split="TEST"):
-        df = pd.read_csv("./data/ground_truth.csv")
+        df = pd.read_csv("./data/sample.csv")
         return df
-    
+        
 
     def generate(self, criterion="consistency", method="reference"):
+
+        criterion_name={"consistency":"consistência","coherence":"coerência","relevance":"relevância","fluency":"fluência"}[criterion]
         
         human_scores = []
         pred_scores = []
@@ -35,18 +49,18 @@ class STJ:
         for i, row in self.dataset.iterrows():
             output_file = open(f"results/stj_{criterion}_{method}.json", "w")
             row_dict = row.to_dict()
-            reference = row_dict["TEXT1"]
-            human_score = row_dict["EXPERT_SCORE"]
+            reference = row_dict["sentence_A"]
+            human_score = row_dict["score"]
             human_scores.append(human_score)
-            candidate = row_dict["TEXT2"]
+            candidate = row_dict["sentence_B"]
             checklist = None
 
             if method == "reference":
-                res = self.client.reference_guided(criterion, reference, candidate, checklist)
+                res = self.client.reference_guided(criterion_name, reference, candidate, checklist)
             elif method == "candidate":
-                res = self.client.candidate_guided(criterion, reference, candidate, checklist)
+                res = self.client.candidate_guided(criterion_name, reference, candidate, checklist)
             elif method == "criterion":
-                res = self.client.criterion_guided(criterion, reference, candidate, checklist)
+                res = self.client.criterion_guided(criterion_name, reference, candidate, checklist)
                 checklist = res['checklist']
             
             row_dict["checklist"] = res["checklist"].to_markdown()
@@ -72,8 +86,8 @@ class STJ:
 
         # recall and precision items are in different orders
         # so we need to match them by score
-        recall = sorted(recall, key=lambda x: x["EXPERT_SCORE"])
-        precision = sorted(precision, key=lambda x: x["EXPERT_SCORE"])
+        recall = sorted(recall, key=lambda x: x["score"])
+        precision = sorted(precision, key=lambda x: x["score"])
 
         n_items = []
         human_scores = []
@@ -82,7 +96,7 @@ class STJ:
             recall_item = recall[i]['check_eval'][criterion]
             precision_item = precision[i]['check_eval'][criterion]
 
-            human_score = recall[i]["EXPERT_SCORE"]
+            human_score = recall[i]["score"]
             human_scores.append(human_score)
 
             
@@ -100,7 +114,7 @@ class STJ:
     
     def load_result(self, criterion, method):
         a = json.load(open(f"results/stj_{criterion}_{method}.json", "r"))
-        a = sorted(a, key=lambda x: x["EXPERT_SCORE"])
+        a = sorted(a, key=lambda x: x["score"])
         return a
 
     def overall(self, method):
@@ -109,32 +123,32 @@ class STJ:
             con_r = self.load_result("consistency", "reference")
             coh_r = self.load_result("coherence", "reference")
             rel_r = self.load_result("relevance", "reference")
-            flu_r = self.load_result("fluency", "reference")
+            # flu_r = self.load_result("fluency", "reference")
 
 
             con_p = self.load_result("consistency", "candidate")
             coh_p = self.load_result("coherence", "candidate")
             rel_p = self.load_result("relevance", "candidate")
-            flu_p = self.load_result("fluency", "candidate")
+            # flu_p = self.load_result("fluency", "candidate")
 
             con = []
             coh = []
             rel = []
-            flu = []
+            # flu = []
 
             #calculate f1
             for i, item in enumerate(con_r):
                 con_item_r = con_r[i]['check_eval']["consistency"]
                 coh_item_r = coh_r[i]['check_eval']["coherence"]
                 rel_item_r = rel_r[i]['check_eval']["relevance"]
-                flu_item_r = flu_r[i]['check_eval']["fluency"]
+                # flu_item_r = flu_r[i]['check_eval']["fluency"]
 
                 con_item_p = con_p[i]['check_eval']["consistency"]
                 coh_item_p = coh_p[i]['check_eval']["coherence"]
                 rel_item_p = rel_p[i]['check_eval']["relevance"]
-                flu_item_p = flu_p[i]['check_eval']["fluency"]
+                # flu_item_p = flu_p[i]['check_eval']["fluency"]
 # 
-                # human_score = con_r[i]["EXPERT_SCORE"]
+                # human_score = con_r[i]["score"]
                 # human_scores.append(human_score)
 
                 # pred_score = (con_item_r + coh_item_r + rel_item_r + flu_item_r) / 4
@@ -155,10 +169,10 @@ class STJ:
                 else:
                     rel_item = 2 * (rel_item_r * rel_item_p) / (rel_item_r + rel_item_p)
 
-                if flu_item_r + flu_item_p == 0:
-                    flu_item = 0
-                else:
-                    flu_item = 2 * (flu_item_r * flu_item_p) / (flu_item_r + flu_item_p)
+                # if flu_item_r + flu_item_p == 0:
+                #     flu_item = 0
+                # else:
+                #     flu_item = 2 * (flu_item_r * flu_item_p) / (flu_item_r + flu_item_p)
 
                 con_r[i]['check_eval']["consistency"] = con_item
                 con.append(con_r[i])
@@ -166,14 +180,14 @@ class STJ:
                 coh.append(coh_r[i])
                 rel_r[i]['check_eval']["relevance"] = rel_item
                 rel.append(rel_r[i])
-                flu_r[i]['check_eval']["fluency"] = flu_item
-                flu.append(flu_r[i])
+                # flu_r[i]['check_eval']["fluency"] = flu_item
+                # flu.append(flu_r[i])
 
         else:
             con = self.load_result("consistency", method)
             coh = self.load_result("coherence", method)
             rel = self.load_result("relevance", method)
-            flu = self.load_result("fluency", method)
+            # flu = self.load_result("fluency", method)
 
 
         n_items = []
@@ -184,12 +198,13 @@ class STJ:
             con_item = con[i]['check_eval']["consistency"]
             coh_item = coh[i]['check_eval']["coherence"]
             rel_item = rel[i]['check_eval']["relevance"]
-            flu_item = flu[i]['check_eval']["fluency"]
+            # flu_item = flu[i]['check_eval']["fluency"]
 
-            human_score = con[i]["EXPERT_SCORE"]
+            human_score = con[i]["score"]
             human_scores.append(human_score)
 
-            pred_score = (con_item + coh_item + rel_item + flu_item) / 4
+            # pred_score = (con_item + coh_item + rel_item + flu_item) / 4
+            pred_score = (con_item + coh_item + rel_item ) / 3
             pred_scores.append(pred_score)
 
         eval_results = calculate_correlation(pred_scores, human_scores, {})

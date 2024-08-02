@@ -50,12 +50,16 @@ class ChecklistResponse(OpenAISchema):
         return sum([item.isChecked for item in self.items])/len(self.items)
 
 class Checkeval:
-    def __init__(self, api_key, model="gpt-4-turbo"):
+    def __init__(self, api_key, model="gpt-4-turbo", criteria_definitions=None):
         self.model = model
         self.client = OpenAI(
             # This is the default and can be omitted
             api_key=api_key,
         )
+        if criteria_definitions is not None:
+            self.criteria_definitions = criteria_definitions
+        else:
+            self.criteria_definitions = default_criterion_definitions
 
     def call_model(self, messages, tools=None, tool_choice=None):
         return self.client.chat.completions.create(
@@ -70,13 +74,15 @@ class Checkeval:
             seed=10
         )
     
-    def generate_checklist(self, criterion, text=None,  prompt=None):
+    def generate_checklist(self, criterion, text=None,  prompt=None, criterion_definition=None):
         if prompt is None:
             # prompts is a directory containing the prompt files it is in the same level of this file inside the package
-            path = Path(__file__).parent / "prompts" / "generate_checklist_pt.md"
-            prompt = open(path).read()
+            if prompt is None:
+                path = Path(__file__).parent / "prompts" / "generate_checklist_pt.md"
+                prompt = open(path).read()
 
-            criterion_definition = default_criterion_definitions.get(criterion, "No definition provided.")
+            if criterion_definition is None:
+                criterion_definition = self.criteria_definitions.get(criterion, "No definition provided.")
 
             prompt = prompt.format(criterion=criterion, criterion_definition=criterion_definition)
         
@@ -105,13 +111,15 @@ class Checkeval:
             chat_completion = self.call_model(messages,tools, {"type":"function","function":{"name":"Checklist"}})
             return Checklist.from_response(chat_completion)
     
-    def evaluate_checklist(self, text, checklist, criterion, prompt=None):
+    def evaluate_checklist(self, text, checklist, criterion, prompt=None,criterion_definition=None):
         if prompt is None:
             # prompts is a directory containing the prompt files it is in the same level of this file inside the package
-            path = Path(__file__).parent / "prompts" / "evaluate_checklist_pt.md"
-            prompt = open(path).read()
+            if prompt is None:
+                path = Path(__file__).parent / "prompts" / "evaluate_checklist_pt.md"
+                prompt = open(path).read()
 
-            criterion_definition = default_criterion_definitions.get(criterion, "No definition provided.")
+            if criterion_definition is None:
+                criterion_definition = self.criteria_definitions.get(criterion, "No definition provided.")
 
             if type(checklist) != str:
                 checklist = checklist.to_markdown()
@@ -129,12 +137,12 @@ class Checkeval:
 
         return ChecklistResponse.from_response(chat_completion)
 
-    def reference_guided(self, criterion, reference, candidate, checklist=None):
+    def reference_guided(self, criterion, reference, candidate, checklist=None,prompt=None, criterion_definition=None):
         
         if checklist is None:
-            checklist = self.generate_checklist(criterion,reference)
+            checklist = self.generate_checklist(criterion,reference, prompt=prompt)
         
-        results = self.evaluate_checklist(candidate, checklist, criterion)
+        results = self.evaluate_checklist(candidate, checklist, criterion,prompt=prompt)
 
         return {
             "checklist":checklist,
@@ -147,7 +155,7 @@ class Checkeval:
 
     def criterion_guided(self, criterion, reference, candidate, checklist=None):
         prompt = open(Path(__file__).parent / "prompts" / "criterion_generate_pt.md").read()
-        criterion_definition = default_criterion_definitions.get(criterion, "No definition provided.")
+        criterion_definition = self.criteria_definitions.get(criterion, "No definition provided.")
         if checklist is None:
             prompt = prompt.format(criterion=criterion, criterion_definition=criterion_definition)
 
